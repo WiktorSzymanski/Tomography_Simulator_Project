@@ -1,19 +1,25 @@
-
+import numpy as np
 
 class ImageExec:
   def __init__(self, image):
-    self.image = image
+    self.image_copy = image
+    self.image = np.copy(self.image_copy)
+
     self.height, self.width, _ = image.shape
+
+  def clear_image(self):
+    self.image = np.copy(self.image_copy)
 
   def set_pixel(self, x, y, color):
     if (x >= self.width or y >= self.height or x < 0 or y < 0):
-      raise Exception(f'Point ({x}, {y}) out of image!!!')
+      return
+      # raise Exception(f'Point ({x}, {y}) out of image!!!')
     self.image[y][x] = color
 
   def draw_bresenham_line(self, point1, point2, color):
     x1, y1 = point1
     x2, y2 = point2
-    
+
     rise = y2 - y1
     run = x2 - x1
 
@@ -59,7 +65,7 @@ class ImageExec:
 
     x1, y1 = point1
     x2, y2 = point2
-    
+
     rise = y2 - y1
     run = x2 - x1
 
