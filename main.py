@@ -3,8 +3,12 @@ import matplotlib.pyplot as plt
 import numpy as np
 from helpers.image_exec import bresenhams_line, image_filtering
 import os
+import io
 import streamlit as st
 import math
+from helpers.dicom import save_as_dicom
+import pydicom
+import datetime
 
 st.set_page_config(
     page_title="CT Scanner Simulation",
@@ -16,30 +20,69 @@ st.set_page_config(
     }
 )
 
+images_tab, dicom_tab = st.sidebar.tabs(["Image", "DICOM"])
+
 IMAGE_DIR = "ct_examples"
 
-file_names = os.listdir(IMAGE_DIR)
-
-selected_file_name = st.sidebar.selectbox("Input image", file_names, index=8)
+selected_file_name = images_tab.selectbox("Input file", os.listdir(IMAGE_DIR))
 selected_file_path = os.path.join(IMAGE_DIR, selected_file_name)
 
-image = np.array(ImageOps.grayscale(Image.open(selected_file_path)))
+uploaded_file = dicom_tab.file_uploader("Choose a file")
 
-image_width, image_height = np.shape(image)
+info_container = st.container()
 
-center_x, center_y = int(image_width / 2), int(image_height / 2)
+# Input values
+detectors_num = images_tab.slider("Number of detectors",
+                                  min_value=10, max_value=360, value=360, step=10)
+delta_alpha = images_tab.slider("Degree step between iteration",
+                                min_value=0.1, max_value=30.0, step=0.1, value=0.8)
+fi = images_tab.slider("Angular span of the detector - emitter system",
+                       min_value=10, max_value=360, step=10, value=180)
 
-radius = np.ceil(np.sqrt(image_height * image_height +
-                         image_width * image_width) / 2)
+use_filtering = images_tab.checkbox("Use filtering")
 
-# ct = st.container()
+if use_filtering:
+    kernel_size = images_tab.slider(
+        "Filtering kernel size", min_value=3, max_value=150, step=2, value=50)
 
-# info_container = ct.container()
+use_dicom = images_tab.checkbox("Save file as dicom")
 
-# scan_container = ct.container()
+if use_dicom:
+    images_tab.subheader("Patient data")
+
+    patient_id = images_tab.text_input("Patient ID")
+    patient_name = images_tab.text_input("Patient Name")
+    patient_age = images_tab.number_input("Patient Age", step=1)
+    study_date = images_tab.date_input("Image Date", datetime.date.today())
+    image_comments = images_tab.text_area("Image Comments")
+    file_name = images_tab.text_input("Output file name")
 
 
-def start_scan():
+def scan():
+    image = np.array(ImageOps.grayscale(Image.open(selected_file_path)))
+
+    image_width, image_height = np.shape(image)
+
+    center_x, center_y = int(image_width / 2), int(image_height / 2)
+
+    radius = np.ceil(np.sqrt(image_height * image_height +
+                            image_width * image_width) / 2)
+
+    info_container = st.container()
+
+    info_container_left_col, info_container_right_col = info_container.columns(2)
+
+    info_container_left_col.header("Loaded data information")
+
+    info_container_left_col.write(f"""
+    Image size: {image_width} {image_height}
+
+    Center: {center_x} {center_y}
+
+    Radius: {radius}
+    """)
+
+    info_container_right_col.image(image)
 
     EMITTERS = []
     DETECTORS = []
@@ -61,9 +104,9 @@ def start_scan():
 
         for i in range(detectors_num):
             D_x = int(radius * math.cos(alpha_rad + math.pi - fi_rad / 2 +
-                      i * (fi_rad / (detectors_num - 1)))) + center_x
+                                        i * (fi_rad / (detectors_num - 1)))) + center_x
             D_y = int(radius * math.sin(alpha_rad + math.pi - fi_rad / 2 +
-                      i * (fi_rad / (detectors_num - 1)))) + center_y
+                                        i * (fi_rad / (detectors_num - 1)))) + center_y
 
             DETECTORS[-1].append((D_x, D_y))
 
@@ -141,52 +184,26 @@ def start_scan():
     st.write("## Filtered")
     st.pyplot(fig_filtered)
 
-    # sinogram = np.array(sinogram)
+    save_as_dicom("test.dcm", backprojected_img, {
+        "PatientName": "TEST",
+        "PatientAge": "TEST",
+        "PatientSex": "TEST",
+        "PatientID": "TEST",
+        'ImageComments': "TEST",
+        "StudyDate": "TEST"
+    })
 
-    # if wdg_filtering.value:
-    #     kernel = []
-    #     for k in range(-int(np.floor(kernel_size/2)), int(np.ceil(kernel_size/2))):
-    #         if k == 0:
-    #             kernel.append(1)
-    #         else:
-    #             if k % 2 == 0:
-    #                 kernel.append(0)
-    #             else:
-    #                 kernel.append((-4 / np.pi**2)/(k**2))
+images_tab.button('Start scan', on_click=scan)
 
-    #     for i in range(len(sinogram)):
-    #         sinogram[i] = np.convolve(sinogram[i], kernel, mode='same')
+if uploaded_file is not None:
 
-    #     plt.imshow(sinogram, cmap='gray')
-    #     plt.show()
+    bytes_data = uploaded_file.getvalue()
+    dicom_file = io.BytesIO(bytes_data)
+    ds = pydicom.dcmread(dicom_file)
 
+    info_container.header("DICOM Image")
 
-# Input values
-detectors_num = st.sidebar.slider("Number of detectors",
-                                  min_value=10, max_value=360, value=360, step=10)
-delta_alpha = st.sidebar.slider("Degree step between iteration",
-                                min_value=0.1, max_value=30.0, step=0.1, value=0.8)
-fi = st.sidebar.slider("Angular span of the detector - emitter system",
-                       min_value=10, max_value=360, step=10, value=180)
+    info_container.image(ds.pixel_array)
 
-kernel_size = st.sidebar.slider(
-    "Filtering kernel size", min_value=3, max_value=150, step=2, value=50)
-
-start_scan_button = st.sidebar.button('Start scan', on_click=start_scan)
-
-# Container
-
-
-# info_container_left_col, info_container_right_col = info_container.columns(2)
-
-st.header("Loaded data information")
-
-st.write(f"""
-Image size: {image_width} {image_height}
-
-Center: {center_x} {center_y}
-
-Radius: {radius}
-""")
-
-st.image(image)
+    info_container.subheader("DICOM File data")
+    info_container.text(ds)
