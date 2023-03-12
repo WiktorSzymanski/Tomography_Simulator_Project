@@ -29,7 +29,7 @@ import numpy as np
 #     return points
 
 
-def bresenhams_line(start_point, end_point, height, width):
+def old_bresenhams_line(start_point, end_point, height, width):
     points = []
 
     def get_pixel(i, j):
@@ -89,5 +89,71 @@ def bresenhams_line(start_point, end_point, height, width):
                 if offset >= threshold:
                     x += adjust
                     threshold += 1
+
+    return points
+
+def bresenhams_line(start_point, end_point, height, width):
+    points = []
+
+    def get_pixel(i, j):
+        if i >= 0 and i < width and j >= 0 and j < height:
+            return (i, j)
+        return None
+
+    x1, y1 = start_point
+    x2, y2 = end_point
+
+    rise = y2 - y1
+    run = x2 - x1
+
+    if run == 0:
+        if y2 < y1:
+            y1, y2 = (y2, y1)
+        for y in range(y1, y2 + 1):
+            pixel = get_pixel(x1, y)
+
+            if (pixel):
+                points.append(pixel)
+    else:
+        m = float(rise) / run
+        adjust = 1 if m >= 0 else -1
+        offset = 0
+
+        if m <= 1 and m >= -1:
+            delta = abs(rise) * 2
+            threshold = abs(run)
+            threshold_inc = abs(run) * 2
+            y = y1
+            if x2 < x1:
+                x1, x2 = (x2, x1)
+                y = y2
+            for x in range(x1, x2 + 1):
+                pixel = get_pixel(x, y)
+
+                if (pixel):
+                    points.append(pixel)
+
+                offset += delta
+                if offset >= threshold:
+                    y += adjust
+                    threshold += threshold_inc
+        else:
+            delta = abs(run) * 2
+            threshold = abs(rise)
+            threshold_inc = abs(rise) * 2
+            x = x1
+            if y2 < y1:
+                y1, y2 = (y2, y1)
+                x = x2
+            for y in range(y1, y2 + 1):
+                pixel = get_pixel(x, y)
+
+                if (pixel):
+                    points.append(pixel)
+
+                offset += delta
+                if offset >= threshold:
+                    x += adjust
+                    threshold += threshold_inc
 
     return points
