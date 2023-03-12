@@ -157,3 +157,23 @@ def bresenhams_line(start_point, end_point, height, width):
                     threshold += threshold_inc
 
     return points
+
+def create_kernel(kernel_size: int):
+    kernel = list()
+
+    for k in range(-(kernel_size // 2), int(np.ceil(kernel_size / 2))):
+        if k == 0:
+            kernel.append(1)
+        else:
+            kernel.append(0) if k % 2 == 0 else kernel.append((-4 / np.pi**2)/(k**2))
+
+    return kernel
+
+
+def image_filtering(sinogram, kernel_size):
+    kernel = create_kernel(kernel_size)
+
+    for i in range(len(sinogram)):
+        sinogram[i] = np.convolve(sinogram[i], kernel, mode='same')
+
+    return sinogram
