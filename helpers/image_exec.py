@@ -1,5 +1,5 @@
 import numpy as np
-
+from PIL import Image
 
 # def bresenhams_line(start_point, end_point, height, width):
 #     x1 = start_point[0]
@@ -177,3 +177,24 @@ def image_filtering(sinogram, kernel_size):
         sinogram[i] = np.convolve(sinogram[i], kernel, mode='same')
 
     return sinogram
+
+
+def image_square(image):
+    width, height = image.size
+    new_size = height if height > width else width
+    squared_img = Image.new('RGB', (new_size, new_size), (0, 0, 0))
+
+    sq_width, sq_height = squared_img.size
+    offset = ((sq_width - width) // 2, (sq_height - height) // 2)
+
+    squared_img.paste(image, offset)
+
+    return {"image" : squared_img, "original_size" : (width, height), "offset" : offset}
+
+def crop_to_original_size(image, original_size, offset):
+    left = offset[0]
+    bottom = offset[1]
+    right = offset[0] + original_size[0]
+    top = offset[1] + original_size[1]
+
+    return image.crop((left, bottom, right, top))
