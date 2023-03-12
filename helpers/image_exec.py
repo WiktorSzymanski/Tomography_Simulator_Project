@@ -1,133 +1,93 @@
 import numpy as np
 
-class ImageExec:
-  def __init__(self, image):
-    self.image_copy = image
-    self.image = np.copy(self.image_copy)
 
-    self.height, self.width, _ = image.shape
+# def bresenhams_line(start_point, end_point, height, width):
+#     x1 = start_point[0]
+#     y1 = start_point[1]
+#     x2 = end_point[0]
+#     y2 = end_point[1]
 
-  def clear_image(self):
-    self.image = np.copy(self.image_copy)
+#     delta_x = x2 - x1
+#     delta_y = y2 - y1
 
-  def set_pixel(self, x, y, color):
-    if (x >= self.width or y >= self.height or x < 0 or y < 0):
-      return
-      # raise Exception(f'Point ({x}, {y}) out of image!!!')
-    self.image[y][x] = color
+#     j = y1
 
-  def get_pixel(self, x, y):
-    if (x >= self.width or y >= self.height or x < 0 or y < 0):
-      return (None, None, None)
-    return self.image[y][x]
+#     e = delta_y - delta_x
 
-  def draw_bresenham_line(self, point1, point2, color):
-    x1, y1 = point1
-    x2, y2 = point2
+#     points = []
 
-    rise = y2 - y1
-    run = x2 - x1
+#     for i in range(x1, x2):
+#         if i >= 0 and i < width and j >= 0 and j < height:
+#             points.append((i, j))
 
-    if run == 0:
-      if y2 < y1:
-        y1, y2 = (y2, y1)
-      for y in range(y1, y2 + 1):
-        self.set_pixel(x1, y, color)
-    else:
-      m = float(rise) / run
-      adjust = 1 if m >= 0 else -1
-      offset = 0
-      threshold = 0.5
+#         if (e >= 0):
+#             j += 1
+#             e -= delta_x
 
-      if m <= 1 and m >= -1:
-        delta = abs(m)
-        y = y1
-        if x2 < x1:
-          x1, x2 = (x2, x1)
-          y = y2
-        for x in range(x1, x2 + 1):
-          self.set_pixel(x, y, color)
-          offset += delta
-          if offset >= threshold:
-            y+= adjust
-            threshold += 1
-      else:
-        delta = abs(float(run) / rise)
-        x = x1
-        if y2 < y1:
-          y1, y2 = (y2, y1)
-          x = x2
-        for y in range(y1, y2 + 1):
-          self.set_pixel(x, y, color)
-          offset += delta
-          if offset >= threshold:
-            x += adjust
-            threshold += 1
+#         e += delta_y
 
-  def calc_bresenham_line(self, point1, point2):
-    sum = 0
-    px = 0
+#     return points
 
-    x1, y1 = point1
-    x2, y2 = point2
+
+def bresenhams_line(start_point, end_point, height, width):
+    points = []
+
+    def get_pixel(i, j):
+        if i >= 0 and i < width and j >= 0 and j < height:
+            return (i, j)
+        return None
+
+    x1, y1 = start_point
+    x2, y2 = end_point
 
     rise = y2 - y1
     run = x2 - x1
 
     if run == 0:
-      if y2 < y1:
-        y1, y2 = (y2, y1)
-      for y in range(y1, y2 + 1):
-        pixel = self.get_pixel(x1, y)[0]
-
-        if (pixel):
-          sum += pixel
-          px += 1
-          self.set_pixel(x1, y, (255, 0, 0))
-    else:
-      m = float(rise) / run
-      adjust = 1 if m >= 0 else -1
-      offset = 0
-      threshold = 0.5
-
-      if m <= 1 and m >= -1:
-        delta = abs(m)
-        y = y1
-        if x2 < x1:
-          x1, x2 = (x2, x1)
-          y = y2
-        for x in range(x1, x2 + 1):
-          pixel = self.get_pixel(x, y)[0]
-
-          if (pixel):
-            sum += pixel
-            px += 1
-            self.set_pixel(x, y, (0, 0, 255))
-
-          offset += delta
-          if offset >= threshold:
-            y+= adjust
-            threshold += 1
-      else:
-        delta = abs(float(run) / rise)
-        x = x1
         if y2 < y1:
-          y1, y2 = (y2, y1)
-          x = x2
+            y1, y2 = (y2, y1)
         for y in range(y1, y2 + 1):
-          pixel = self.get_pixel(x, y)[0]
+            pixel = get_pixel(x1, y)
 
-          if (pixel):
-            sum += pixel
-            px += 1
-            self.set_pixel(x, y, (0, 255, 0))
+            if (pixel):
+                points.append(pixel)
+    else:
+        m = float(rise) / run
+        adjust = 1 if m >= 0 else -1
+        offset = 0
+        threshold = 0.5
 
-          offset += delta
-          if offset >= threshold:
-            x += adjust
-            threshold += 1
+        if m <= 1 and m >= -1:
+            delta = abs(m)
+            y = y1
+            if x2 < x1:
+                x1, x2 = (x2, x1)
+                y = y2
+            for x in range(x1, x2 + 1):
+                pixel = get_pixel(x, y)
 
+                if (pixel):
+                    points.append(pixel)
 
-    if px == 0:
-        return 0, 0, 0
-    return sum, px, sum / px
+                offset += delta
+                if offset >= threshold:
+                    y += adjust
+                    threshold += 1
+        else:
+            delta = abs(float(run) / rise)
+            x = x1
+            if y2 < y1:
+                y1, y2 = (y2, y1)
+                x = x2
+            for y in range(y1, y2 + 1):
+                pixel = get_pixel(x, y)
+
+                if (pixel):
+                    points.append(pixel)
+
+                offset += delta
+                if offset >= threshold:
+                    x += adjust
+                    threshold += 1
+
+    return points
