@@ -181,6 +181,10 @@ def image_filtering(sinogram, kernel_size):
 
 def image_square(image):
     width, height = image.size
+
+    if width == height:
+        return True, {"image" : image}
+
     new_size = height if height > width else width
     squared_img = Image.new('RGB', (new_size, new_size), (0, 0, 0))
 
@@ -189,7 +193,7 @@ def image_square(image):
 
     squared_img.paste(image, offset)
 
-    return {"image" : squared_img, "original_size" : (width, height), "offset" : offset}
+    return False, {"image" : squared_img, "original_size" : (width, height), "offset" : offset}
 
 def crop_to_original_size(image, original_size, offset):
     left = offset[0]
@@ -197,4 +201,4 @@ def crop_to_original_size(image, original_size, offset):
     right = offset[0] + original_size[0]
     top = offset[1] + original_size[1]
 
-    return image.crop((left, bottom, right, top))
+    return image[bottom:top, left:right]

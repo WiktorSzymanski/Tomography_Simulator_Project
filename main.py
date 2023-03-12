@@ -1,7 +1,11 @@
 from PIL import Image, ImageOps
 import matplotlib.pyplot as plt
 import numpy as np
-from helpers.image_exec import bresenhams_line, image_filtering
+from helpers.image_exec import (
+    bresenhams_line,
+    image_filtering,
+    image_square,
+    crop_to_original_size)
 import os
 import io
 import streamlit as st
@@ -55,26 +59,36 @@ if use_dicom:
     patient_age = images_tab.number_input("Patient Age", step=1)
     study_date = images_tab.date_input("Image Date", datetime.date.today())
     image_comments = images_tab.text_area("Image Comments")
-    file_name = images_tab.text_input("Output file name")
+    dicom_file_name = images_tab.text_input("Output file name")
 
 
 def scan():
-    image = np.array(ImageOps.grayscale(Image.open(selected_file_path)))
+    info_container = st.container()
+    info_container_left_col, info_container_right_col = info_container.columns(
+        2)
+
+    info_container_left_col.header("CT Scan Simulation")
+
+    progress_bar_text = "Scanning"
+    progress_bar = info_container_left_col.progress(0, progress_bar_text)
+
+    image = Image.open(selected_file_path)
+
+    info_container_left_col.subheader("Loaded image")
+    info_container_left_col.image(image)
+
+    is_square, image_data = image_square(image)
+
+    image = np.array(ImageOps.grayscale(image_data.get('image')))
 
     image_width, image_height = np.shape(image)
 
     center_x, center_y = int(image_width / 2), int(image_height / 2)
 
     radius = np.ceil(np.sqrt(image_height * image_height +
-                            image_width * image_width) / 2)
+                             image_width * image_width) / 2)
 
-    info_container = st.container()
-
-    info_container_left_col, info_container_right_col = info_container.columns(2)
-
-    info_container_left_col.header("Loaded data information")
-
-    info_container_left_col.write(f"""
+    info_container_right_col.write(f"""
     Image size: {image_width} {image_height}
 
     Center: {center_x} {center_y}
@@ -82,14 +96,9 @@ def scan():
     Radius: {radius}
     """)
 
-    info_container_right_col.image(image)
-
     EMITTERS = []
     DETECTORS = []
     LINES = []
-
-    progress_bar_text = "Scanning"
-    progress_bar = st.progress(0, progress_bar_text)
 
     for alpha in np.arange(0, 360, delta_alpha):
         alpha_rad = np.radians(alpha)
@@ -136,7 +145,10 @@ def scan():
 
         progress_bar.progress((i + 1) / len(LINES), progress_bar_text)
 
-    fig_unfiltered, (ax_sinogram, ax_image) = plt.subplots(1, 2)
+    if use_filtering:
+        sinogram = image_filtering(sinogram, kernel_size)
+
+    fig, (ax_sinogram, ax_image) = plt.subplots(1, 2)
     ax_sinogram.imshow(sinogram, 'gray')
 
     # Back projection
@@ -151,47 +163,22 @@ def scan():
 
         progress_bar.progress((i + 1) / len(sinogram), progress_bar_text)
 
-    ax_image.imshow(backprojected_img, 'gray')
-    st.write("## Unfiltered")
-    st.pyplot(fig_unfiltered)
-
-    progress_bar.progress(0, "Filtering sinogram")
-    sinogram = image_filtering(sinogram, kernel_size)
-    progress_bar.progress(1, "Filtering sinogram")
-
-    fig_filtered, (ax_sinogram, ax_image) = plt.subplots(1, 2)
-
-    ax_sinogram.imshow(sinogram, 'gray')
-
-    # sinogram_col, image_col = scan_container.container().columns(2)
-
-    # Filtering
-
-    # Back projection
-    backprojected_img = np.zeros((image_height, image_width))
-
-    progress_bar_text = "Back projection for filtered sinogram"
-    progress_bar.progress(0, progress_bar_text)
-
-    for i in range(len(sinogram)):
-        for j in range(detectors_num):
-            for (x, y) in LINES[i][j]:
-                backprojected_img[x][y] += sinogram[i][j]
-
-        progress_bar.progress((i + 1) / len(sinogram), progress_bar_text)
+    if (not is_square):
+        backprojected_img = crop_to_original_size(
+            backprojected_img, image_data.get('original_size'), image_data.get('offset'))
 
     ax_image.imshow(backprojected_img, 'gray')
-    st.write("## Filtered")
-    st.pyplot(fig_filtered)
 
-    save_as_dicom("test.dcm", backprojected_img, {
-        "PatientName": "TEST",
-        "PatientAge": "TEST",
-        "PatientSex": "TEST",
-        "PatientID": "TEST",
-        'ImageComments': "TEST",
-        "StudyDate": "TEST"
-    })
+    st.pyplot(fig)
+
+    if use_dicom:
+        save_as_dicom("dicom_examples/" + dicom_file_name, backprojected_img, {
+            "PatientName": patient_name,
+            "PatientAge": patient_age,
+            "PatientID": patient_id,
+            'ImageComments': image_comments,
+            "StudyDate": study_date
+        })
 
 images_tab.button('Start scan', on_click=scan)
 
