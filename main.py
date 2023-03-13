@@ -1,14 +1,11 @@
 from PIL import Image, ImageOps
 import matplotlib.pyplot as plt
 import numpy as np
-from helpers.image_exec import (
-    bresenhams_line,
-    image_filtering,
-    image_square,
-    crop_to_original_size)
+import lib.ui as ui
+from lib.dicom import save_as_dicom
+from lib.image import (bresenhams_line, image_filtering,
+                       image_square, crop_to_original_size)
 import streamlit as st
-from helpers.dicom import save_as_dicom
-import ui
 
 simulation_tab, dicom_tab = ui.setup()
 

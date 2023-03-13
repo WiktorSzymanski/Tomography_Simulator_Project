@@ -3,3 +3,17 @@
 **/__pycache__
 
 .vscode
+
+
+dicom_examples/*
+dicom_examples/*.dcm
+!dicom_examples/.gitignore
+!dicom_examples/shepp_logan.dcm
+!dicom_examples/CT_ScoutView.dcm
+!dicom_examples/CT_ScoutView-large.dcm
+!dicom_examples/Kolo.dcm
+!dicom_examples/Kropka.dcm
+!dicom_examples/Kwadraty2.dcm
+!dicom_examples/Paski2.dcm
+!dicom_examples/SADDLE_PE.dcm
+!dicom_examples/SADDLE_PE-large.dcm
