@@ -6,76 +6,31 @@ from helpers.image_exec import (
     image_filtering,
     image_square,
     crop_to_original_size)
-import os
-import io
 import streamlit as st
-import math
 from helpers.dicom import save_as_dicom
-import pydicom
-import datetime
+import ui
 
-st.set_page_config(
-    page_title="CT Scanner Simulation",
-    page_icon="🧠",
-    layout="wide",
-    initial_sidebar_state="expanded",
-    menu_items={
-        'About': "Made by [Adrian Kokot](https://github.com/AdrianKokot) and [Wiktor Szymański](https://github.com/WiktorSzymanski) for \"_Computer Science in Medicine_\" classes at Poznan University of Technology"
-    }
-)
+simulation_tab, dicom_tab = ui.setup()
 
-images_tab, dicom_tab = st.sidebar.tabs(["Image", "DICOM"])
+scan_form = st.session_state
 
-IMAGE_DIR = "ct_examples"
-
-selected_file_name = images_tab.selectbox("Input file", os.listdir(IMAGE_DIR))
-selected_file_path = os.path.join(IMAGE_DIR, selected_file_name)
-
-uploaded_file = dicom_tab.file_uploader("Choose a file")
-
-info_container = st.container()
-
-# Input values
-detectors_num = images_tab.slider("Number of detectors",
-                                  min_value=10, max_value=360, value=360, step=10)
-delta_alpha = images_tab.slider("Degree step between iteration",
-                                min_value=0.1, max_value=30.0, step=0.1, value=0.8)
-fi = images_tab.slider("Angular span of the detector - emitter system",
-                       min_value=10, max_value=360, step=10, value=180)
-
-use_filtering = images_tab.checkbox("Use filtering")
-
-if use_filtering:
-    kernel_size = images_tab.slider(
-        "Filtering kernel size", min_value=3, max_value=150, step=2, value=50)
-
-use_dicom = images_tab.checkbox("Save file as dicom")
-
-if use_dicom:
-    images_tab.subheader("Patient data")
-
-    patient_id = images_tab.text_input("Patient ID")
-    patient_name = images_tab.text_input("Patient Name")
-    patient_age = images_tab.number_input("Patient Age", step=1)
-    study_date = images_tab.date_input("Image Date", datetime.date.today())
-    image_comments = images_tab.text_area("Image Comments")
-    dicom_file_name = images_tab.text_input("Output file name")
+if not scan_form.scan_started:
+    st.stop()
 
 
-def scan():
-    info_container = st.container()
-    info_container_left_col, info_container_right_col = info_container.columns(
-        2)
+@st.cache_data(show_spinner=False)
+def ct_scan_simulation(image_path: str, delta_alpha: float, detectors_num: int, fi: int):
+    progress_bar = st.progress(0.0)
 
-    info_container_left_col.header("CT Scan Simulation")
+    def progress_callback(progress):
+        progress = progress * 1.0
+        progress_bar.progress(
+            progress, "Scanning {0:.2f}%".format(progress * 100.0))
 
-    progress_bar_text = "Scanning"
-    progress_bar = info_container_left_col.progress(0, progress_bar_text)
+        if progress == 1:
+            progress_bar.empty()
 
-    image = Image.open(selected_file_path)
-
-    info_container_left_col.subheader("Loaded image")
-    info_container_left_col.image(image)
+    image = Image.open(image_path)
 
     is_square, image_data = image_square(image)
 
@@ -88,109 +43,164 @@ def scan():
     radius = np.ceil(np.sqrt(image_height * image_height +
                              image_width * image_width) / 2)
 
-    info_container_right_col.write(f"""
-    Image size: {image_width} {image_height}
-
-    Center: {center_x} {center_y}
-
-    Radius: {radius}
-    """)
-
     EMITTERS = []
     DETECTORS = []
-    LINES = []
-
-    for alpha in np.arange(0, 360, delta_alpha):
-        alpha_rad = np.radians(alpha)
-        fi_rad = np.radians(fi)
-
-        E_x = int(radius * math.cos(alpha_rad)) + center_x
-        E_y = int(radius * math.sin(alpha_rad)) + center_y
-
-        EMITTERS.append((E_x, E_y))
-        DETECTORS.append([])
-        LINES.append([])
-
-        for i in range(detectors_num):
-            D_x = int(radius * math.cos(alpha_rad + math.pi - fi_rad / 2 +
-                                        i * (fi_rad / (detectors_num - 1)))) + center_x
-            D_y = int(radius * math.sin(alpha_rad + math.pi - fi_rad / 2 +
-                                        i * (fi_rad / (detectors_num - 1)))) + center_y
-
-            DETECTORS[-1].append((D_x, D_y))
-
-            LINES[-1].append(bresenhams_line((E_x, E_y),
-                                             (D_x, D_y), image_height, image_width))
-
-        progress_bar.progress(alpha / 360.0, progress_bar_text)
 
     # Sinogram
-    sinogram = []
+    angles = np.arange(0, 360, delta_alpha)
+    angles_num = len(angles)
 
-    progress_bar_text = "Creating sinogram"
-    progress_bar.progress(0, progress_bar_text)
+    sinogram = np.zeros((angles_num, detectors_num))
+    sinogram_history = []
 
-    for i in range(len(LINES)):
-        sinogram.append([])
+    progress_callback(0)
 
-        for line in LINES[i]:
-            sum = 0
+    for angle_num in range(angles_num):
+        alpha_rad = np.radians(angles[angle_num])
+        fi_rad = np.radians(fi)
+
+        E_x = int(radius * np.cos(alpha_rad)) + center_x
+        E_y = int(radius * np.sin(alpha_rad)) + center_y
+        emitter = (E_x, E_y)
+
+        EMITTERS.append(emitter)
+        DETECTORS.append([])
+
+        for i in range(detectors_num):
+            D_x = int(radius * np.cos(alpha_rad + np.pi - fi_rad / 2 +
+                                      i * (fi_rad / (detectors_num - 1)))) + center_x
+            D_y = int(radius * np.sin(alpha_rad + np.pi - fi_rad / 2 +
+                                      i * (fi_rad / (detectors_num - 1)))) + center_y
+
+            detector = (D_x, D_y)
+
+            DETECTORS[-1].append(detector)
+
+            line = bresenhams_line(
+                emitter, detector,  image_height, image_width)
+
+            sinogram_value = 0
+            points = 0
+
             for (x, y) in line:
-                sum += image[x][y]
+                sinogram_value += image[x][y]
+                points += 1
 
-            if (len(line) == 0):
-                sinogram[-1].append(sum)
-            else:
-                sinogram[-1].append(sum / len(line))
+            if points > 0:
+                sinogram_value = sinogram_value / points
 
-        progress_bar.progress((i + 1) / len(LINES), progress_bar_text)
+            sinogram[angle_num][i] = sinogram_value
 
-    if use_filtering:
-        sinogram = image_filtering(sinogram, kernel_size)
+        progress_callback((angle_num + 1) / angles_num)
+        sinogram_history.append(np.copy(sinogram))
 
-    fig, (ax_sinogram, ax_image) = plt.subplots(1, 2)
-    ax_sinogram.imshow(sinogram, 'gray')
+    progress_callback(1)
 
-    # Back projection
+    return (EMITTERS, DETECTORS, sinogram, sinogram_history, (image_width, image_height), (is_square, image_data))
+
+
+@st.cache_data(show_spinner=False)
+def backprojection(image_shape, sinogram, EMITTERS, DETECTORS):
+    progress_bar = st.progress(0.0)
+
+    def progress_callback(progress):
+        progress = progress * 1.0
+        progress_bar.progress(
+            progress, "Back projection {0:.2f}%".format(progress * 100.0))
+
+        if progress == 1:
+            progress_bar.empty()
+
+    image_width, image_height = image_shape
     backprojected_img = np.zeros((image_height, image_width))
-    progress_bar_text = "Back projection"
-    progress_bar.progress(0, progress_bar_text)
+
+    backprojection_history = []
+    progress_callback(0)
 
     for i in range(len(sinogram)):
-        for j in range(detectors_num):
-            for (x, y) in LINES[i][j]:
+        for j in range(len(sinogram[i])):
+            for (x, y) in bresenhams_line(EMITTERS[i], DETECTORS[i][j], image_height, image_width):
                 backprojected_img[x][y] += sinogram[i][j]
 
-        progress_bar.progress((i + 1) / len(sinogram), progress_bar_text)
+        backprojection_history.append(np.copy(backprojected_img))
+        progress_callback((i + 1) / len(sinogram))
+
+    progress_callback(1)
+
+    return (backprojected_img, backprojection_history)
+
+
+@st.cache_data(show_spinner=False)
+def run(selected_file_path, delta_alpha, detectors_num, fi, filtering_config, dicom_config):
+
+    EMITTERS, DETECTORS, sinogram, sinogram_history, shape, (is_square, image_data) = ct_scan_simulation(
+        selected_file_path, delta_alpha, detectors_num, fi)
+
+    if filtering_config['use_filtering']:
+        sinogram = image_filtering(sinogram, filtering_config['kernel_size'])
+
+    # Back projection
+    backprojected_img, backprojection_history = backprojection(
+        shape, sinogram, EMITTERS, DETECTORS)
 
     if (not is_square):
         backprojected_img = crop_to_original_size(
             backprojected_img, image_data.get('original_size'), image_data.get('offset'))
 
-    ax_image.imshow(backprojected_img, 'gray')
-
-    st.pyplot(fig)
-
-    if use_dicom:
-        save_as_dicom("dicom_examples/" + dicom_file_name, backprojected_img, {
-            "PatientName": patient_name,
-            "PatientAge": patient_age,
-            "PatientID": patient_id,
-            'ImageComments': image_comments,
-            "StudyDate": study_date
+    if dicom_config['use_dicom']:
+        save_as_dicom("dicom_examples/" + dicom_config['dicom_file_name'], backprojected_img, {
+            "PatientName": dicom_config['patient_name'],
+            "PatientBirthDate": dicom_config['patient_birth_date'],
+            "PatientID": dicom_config['patient_id'],
+            'ImageComments': dicom_config['image_comments'],
+            "StudyDate": dicom_config['study_date']
         })
 
-images_tab.button('Start scan', on_click=scan)
+    return (sinogram, sinogram_history, backprojected_img, backprojection_history)
 
-if uploaded_file is not None:
 
-    bytes_data = uploaded_file.getvalue()
-    dicom_file = io.BytesIO(bytes_data)
-    ds = pydicom.dcmread(dicom_file)
+filtering_config = {
+    'use_filtering': scan_form.use_filtering
+}
+dicom_config = {
+    'use_dicom': scan_form.use_dicom
+}
 
-    info_container.header("DICOM Image")
+if filtering_config['use_filtering']:
+    filtering_config.update({'kernel_size': scan_form.kernel_size})
 
-    info_container.image(ds.pixel_array)
+if dicom_config['use_dicom']:
+    dicom_config.update({'dicom_file_name': scan_form.dicom_file_name,
+                         'patient_name': scan_form.patient_name,
+                         'patient_birth_date': scan_form.patient_birth_date,
+                         'patient_id': scan_form.patient_id,
+                         'image_comments': scan_form.image_comments,
+                         'study_date': scan_form.study_date})
 
-    info_container.subheader("DICOM File data")
-    info_container.text(ds)
+
+sinogram, sinogram_history, backprojected_img, backprojection_history = run(
+    scan_form.image_path, scan_form.delta_alpha, scan_form.number_of_detectors, scan_form.fi, filtering_config, dicom_config)
+
+fig, (ax_sinogram, ax_image) = plt.subplots(1, 2)
+
+show_steps = simulation_tab.checkbox("Show steps")
+
+if show_steps:
+    step_num = simulation_tab.slider(
+        "Step number",
+        min_value=0,
+        max_value=len(sinogram_history) - 1,
+        step=1,
+        value=len(sinogram_history) - 1
+    )
+
+    ax_sinogram.imshow(sinogram_history[step_num], 'gray')
+    ax_image.imshow(backprojection_history[step_num], 'gray')
+else:
+    ax_sinogram.imshow(sinogram, 'gray')
+    ax_image.imshow(backprojected_img, 'gray')
+
+ax_sinogram.axis('off')
+ax_image.axis('off')
+
+simulation_tab.pyplot(fig)

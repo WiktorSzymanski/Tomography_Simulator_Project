@@ -10,12 +10,12 @@ def convert_image_to_ubyte(img):
 
 def save_as_dicom(file_name, img, patient_data):
     img_converted = convert_image_to_ubyte(img)
-    
+
     # Populate required values for file meta information
     meta = Dataset()
     meta.MediaStorageSOPClassUID = pydicom._storage_sopclass_uids.CTImageStorage
     meta.MediaStorageSOPInstanceUID = pydicom.uid.generate_uid()
-    meta.TransferSyntaxUID = pydicom.uid.ExplicitVRLittleEndian  
+    meta.TransferSyntaxUID = pydicom.uid.ExplicitVRLittleEndian
 
     ds = FileDataset(None, {}, preamble=b"\0" * 128)
     ds.file_meta = meta
@@ -25,11 +25,12 @@ def save_as_dicom(file_name, img, patient_data):
 
     ds.SOPClassUID = pydicom._storage_sopclass_uids.CTImageStorage
     ds.SOPInstanceUID = meta.MediaStorageSOPInstanceUID
-    
+
     ds.PatientName = patient_data["PatientName"]
+    ds.PatientBirthDate = patient_data["PatientBirthDate"]
     ds.PatientID = patient_data["PatientID"]
     ds.ImageComments = patient_data["ImageComments"]
-    
+    ds.StudyDate = patient_data["StudyDate"]
 
     ds.Modality = "CT"
     ds.SeriesInstanceUID = pydicom.uid.generate_uid()
