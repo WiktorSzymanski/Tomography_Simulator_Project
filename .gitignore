@@ -17,3 +17,5 @@ dicom_examples/*.dcm
 !dicom_examples/Paski2.dcm
 !dicom_examples/SADDLE_PE.dcm
 !dicom_examples/SADDLE_PE-large.dcm
+
+**/history

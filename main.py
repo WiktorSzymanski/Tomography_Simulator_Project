@@ -5,11 +5,14 @@ import lib.ui as ui
 from lib.dicom import save_as_dicom
 from lib.image import (bresenhams_line, image_filtering,
                        image_square, crop_to_original_size)
+from lib.history_saver import HistorySaver
 import streamlit as st
 
 simulation_tab, dicom_tab = ui.setup()
 
 scan_form = st.session_state
+
+history_saver = HistorySaver()
 
 if not scan_form.scan_started:
     st.stop()
@@ -52,7 +55,7 @@ def ct_scan_simulation(image_path: str, delta_alpha: float, detectors_num: int, 
 
     progress_callback(0)
 
-    for angle_num in range(angles_num):
+    for step, angle_num in enumerate(range(angles_num)):
         alpha_rad = np.radians(angles[angle_num])
         fi_rad = np.radians(fi)
 
@@ -89,7 +92,7 @@ def ct_scan_simulation(image_path: str, delta_alpha: float, detectors_num: int, 
             sinogram[angle_num][i] = sinogram_value
 
         progress_callback((angle_num + 1) / angles_num)
-        sinogram_history.append(np.copy(sinogram))
+        history_saver.save_history('sinogram', step, np.copy(sinogram))
 
     progress_callback(1)
 
@@ -119,7 +122,7 @@ def backprojection(image_shape, sinogram, EMITTERS, DETECTORS):
             for (x, y) in bresenhams_line(EMITTERS[i], DETECTORS[i][j], image_height, image_width):
                 backprojected_img[x][y] += sinogram[i][j]
 
-        backprojection_history.append(np.copy(backprojected_img))
+        history_saver.save_history('backprojection', i, np.copy(backprojected_img))
         progress_callback((i + 1) / len(sinogram))
 
     progress_callback(1)
@@ -129,6 +132,8 @@ def backprojection(image_shape, sinogram, EMITTERS, DETECTORS):
 
 @st.cache_data(show_spinner=False)
 def run(selected_file_path, delta_alpha, detectors_num, fi, filtering_config, dicom_config):
+    
+    history_saver.clear_history()
 
     EMITTERS, DETECTORS, sinogram, sinogram_history, shape, (is_square, image_data) = ct_scan_simulation(
         selected_file_path, delta_alpha, detectors_num, fi)
@@ -183,16 +188,17 @@ fig, (ax_sinogram, ax_image) = plt.subplots(1, 2)
 show_steps = simulation_tab.checkbox("Show steps")
 
 if show_steps:
+    steps_len = history_saver.how_many_steps('sinogram')
     step_num = simulation_tab.slider(
         "Step number",
         min_value=0,
-        max_value=len(sinogram_history) - 1,
+        max_value=steps_len - 1,
         step=1,
-        value=len(sinogram_history) - 1
+        value=steps_len - 1
     )
 
-    ax_sinogram.imshow(sinogram_history[step_num], 'gray')
-    ax_image.imshow(backprojection_history[step_num], 'gray')
+    ax_sinogram.imshow(history_saver.load_history('sinogram', step_num), 'gray')
+    ax_image.imshow(history_saver.load_history('backprojection', step_num), 'gray')
 else:
     ax_sinogram.imshow(sinogram, 'gray')
     ax_image.imshow(backprojected_img, 'gray')
