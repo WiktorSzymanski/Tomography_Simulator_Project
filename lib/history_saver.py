@@ -1,5 +1,4 @@
 import os
-import glob
 import numpy as np
 import streamlit as st
 import shutil
@@ -7,8 +6,8 @@ import shutil
 @st.cache_resource
 class HistorySaver:
 
-    def __init__(self):
-        self.path = './history'
+    def __init__(self, path='./history'):
+        self.path = path
 
     def how_many_steps(self, name):
         path = f'{self.path}/{name}'

@@ -51,7 +51,6 @@ def ct_scan_simulation(image_path: str, delta_alpha: float, detectors_num: int, 
     angles_num = len(angles)
 
     sinogram = np.zeros((angles_num, detectors_num))
-    sinogram_history = []
 
     progress_callback(0)
 
@@ -96,7 +95,7 @@ def ct_scan_simulation(image_path: str, delta_alpha: float, detectors_num: int, 
 
     progress_callback(1)
 
-    return (EMITTERS, DETECTORS, sinogram, sinogram_history, (image_width, image_height), (is_square, image_data))
+    return (EMITTERS, DETECTORS, sinogram, (image_width, image_height), (is_square, image_data))
 
 
 @st.cache_data(show_spinner=False)
@@ -114,7 +113,7 @@ def backprojection(image_shape, sinogram, EMITTERS, DETECTORS):
     image_width, image_height = image_shape
     backprojected_img = np.zeros((image_height, image_width))
 
-    backprojection_history = []
+    
     progress_callback(0)
 
     for i in range(len(sinogram)):
@@ -127,7 +126,7 @@ def backprojection(image_shape, sinogram, EMITTERS, DETECTORS):
 
     progress_callback(1)
 
-    return (backprojected_img, backprojection_history)
+    return backprojected_img
 
 
 @st.cache_data(show_spinner=False)
@@ -135,14 +134,14 @@ def run(selected_file_path, delta_alpha, detectors_num, fi, filtering_config, di
     
     history_saver.clear_history()
 
-    EMITTERS, DETECTORS, sinogram, sinogram_history, shape, (is_square, image_data) = ct_scan_simulation(
+    EMITTERS, DETECTORS, sinogram, shape, (is_square, image_data) = ct_scan_simulation(
         selected_file_path, delta_alpha, detectors_num, fi)
 
     if filtering_config['use_filtering']:
         sinogram = image_filtering(sinogram, filtering_config['kernel_size'])
 
     # Back projection
-    backprojected_img, backprojection_history = backprojection(
+    backprojected_img = backprojection(
         shape, sinogram, EMITTERS, DETECTORS)
 
     if (not is_square):
@@ -158,7 +157,7 @@ def run(selected_file_path, delta_alpha, detectors_num, fi, filtering_config, di
             "StudyDate": dicom_config['study_date']
         })
 
-    return (sinogram, sinogram_history, backprojected_img, backprojection_history)
+    return (sinogram, backprojected_img)
 
 
 filtering_config = {
@@ -180,7 +179,7 @@ if dicom_config['use_dicom']:
                          'study_date': scan_form.study_date})
 
 
-sinogram, sinogram_history, backprojected_img, backprojection_history = run(
+sinogram, backprojected_img = run(
     scan_form.image_path, scan_form.delta_alpha, scan_form.number_of_detectors, scan_form.fi, filtering_config, dicom_config)
 
 fig, (ax_sinogram, ax_image) = plt.subplots(1, 2)
