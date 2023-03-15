@@ -1,9 +1,7 @@
 import os
 import numpy as np
-import streamlit as st
 import shutil
 
-@st.cache_resource
 class HistorySaver:
 
     def __init__(self, path='./history'):
