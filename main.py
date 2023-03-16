@@ -47,10 +47,11 @@ def ct_scan_simulation(image_path: str, delta_alpha: float, detectors_num: int, 
     angles = np.arange(0, 360, delta_alpha)
     angles_num = len(angles)
 
-    sinogram = np.zeros((angles_num, detectors_num))
     sinogram_history = []
 
     progress_callback(0)
+
+    sinogram = np.zeros((angles_num, detectors_num))
 
     for angle_num in range(angles_num):
         alpha_rad = np.radians(angles[angle_num])
@@ -88,8 +89,8 @@ def ct_scan_simulation(image_path: str, delta_alpha: float, detectors_num: int, 
 
             sinogram[angle_num][i] = sinogram_value
 
-        progress_callback((angle_num + 1) / angles_num)
         sinogram_history.append(np.copy(sinogram))
+        progress_callback((angle_num + 1) / angles_num)
 
     progress_callback(1)
 
@@ -197,7 +198,16 @@ else:
     ax_sinogram.imshow(sinogram, 'gray')
     ax_image.imshow(backprojected_img, 'gray')
 
+fig_original, ax_original = plt.subplots(1, 1)
+ax_original.imshow(Image.open(scan_form.image_path))
+
+ax_original.title.set_text("Input image")
+ax_sinogram.title.set_text("Sinogram")
+ax_image.title.set_text("Back projection")
+
+ax_original.axis('off')
 ax_sinogram.axis('off')
 ax_image.axis('off')
 
+simulation_tab.pyplot(fig_original)
 simulation_tab.pyplot(fig)
