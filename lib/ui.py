@@ -49,7 +49,7 @@ def setup():
     form_container.slider(
         "Number of detectors",
         min_value=10,
-        max_value=360,
+        max_value=720,
         value=360,
         step=10,
         key='number_of_detectors',
@@ -69,8 +69,8 @@ def setup():
     form_container.slider(
         "Angular span of the detector - emitter system",
         min_value=10,
-        max_value=360,
-        step=10,
+        max_value=270,
+        step=5,
         value=180,
         key='fi',
         on_change=reset_submit
