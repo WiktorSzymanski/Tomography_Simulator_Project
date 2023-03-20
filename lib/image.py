@@ -111,3 +111,6 @@ def crop_to_original_size(image, original_size, offset):
     top = offset[1] + original_size[1]
 
     return image[bottom:top, left:right]
+
+def calc_RMSE(true_data, pred_data):
+  return np.sqrt(np.square(np.subtract(true_data, pred_data)).mean())

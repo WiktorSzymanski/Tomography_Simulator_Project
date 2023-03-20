@@ -4,7 +4,8 @@ import numpy as np
 import lib.ui as ui
 from lib.dicom import save_as_dicom
 from lib.image import (bresenhams_line, image_filtering,
-                       image_square, crop_to_original_size)
+                       image_square, crop_to_original_size,
+                       calc_RMSE)
 import streamlit as st
 
 simulation_tab, dicom_tab = ui.setup()
@@ -199,7 +200,9 @@ else:
     ax_image.imshow(backprojected_img, 'gray')
 
 fig_original, ax_original = plt.subplots(1, 1)
-ax_original.imshow(Image.open(scan_form.image_path))
+
+image = Image.open(scan_form.image_path)
+ax_original.imshow(image)
 
 ax_original.title.set_text("Input image")
 ax_sinogram.title.set_text("Sinogram")
@@ -209,5 +212,7 @@ ax_original.axis('off')
 ax_sinogram.axis('off')
 ax_image.axis('off')
 
-simulation_tab.pyplot(fig_original)
 simulation_tab.pyplot(fig)
+simulation_tab.pyplot(fig_original)
+
+simulation_tab.text(f'RMSE: {calc_RMSE(np.array(ImageOps.grayscale(image)), backprojected_img)}')
